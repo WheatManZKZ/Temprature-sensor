@@ -1,52 +1,58 @@
-# Prerequisites
-*.d
+/*---------------------------------------------------------------
+FileName: main.c
+Function: 单片机通过1-wire总线协议控制DS18B20测量当前环境的温度，
+并将采集回的温度数据实时显示在LCD1602上。
+Description: 测温范围：-55°C ~ 125°C。
+Author: Zhang Kaizhou
+Date: 2019-6-21 11:26:22
+----------------------------------------------------------------*/
+#include "TempratureMeasure.h"
 
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
+/*定义全局变量*/
+float temprature; // 存放从18B20温度暂存器中读取的温度数据
 
-# Linker output
-*.ilk
-*.map
-*.exp
 
-# Precompiled Headers
-*.gch
-*.pch
+/*主函数*/
+void main(){
+	LCDInit();
+	start18B20();
+	while(1){
+		getTemprature();
+		display(temprature);
+	}
+}
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
+/*设置18B20报警温度的上下限*/
+void setAlarmTemprature(){
+	initResetBus();
+	delay(1);
+	writeByte18B20(0xcc); // 总线上只有一个18B20, 跳过ROM序列检测
+	writeByte18B20(0x4e); // 写暂存器指令
+	
+}
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
+/*启动18B20开始从环境中获取温度*/
+void start18B20(){
+	initResetBus();
+	delay(1);
+	writeByte18B20(0xcc); // 总线上只有一个18B20, 跳过ROM序列检测
+	writeByte18B20(0x44); // 启动18B20开始温度转换
+	writeByte18B20(0x44); // 报警温度上限
+	writeByte18B20(0x44); // 报警温度下限
+}
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+/*MCU从18B20的温度暂存器中读取温度*/
+void getTemprature(){
+	uchar tLow, tHigh;
+	uint result;
+	initResetBus(); // 复位总线
+	delay(1);
+	writeByte18B20(0xcc); // 总线上只有一个18B20, 跳过ROM序列检测
+	writeByte18B20(0xbe); // 启动18B20开始温度转换
+	readByte18B20(&tLow); // 读取温度暂存器中的低字节
+	readByte18B20(&tHigh); // 读取温度暂存器中的低字节
+	result = tHigh; // 高低字节合并成一个双字节数据
+	result <<= 8;
+	result |= tLow;
+	temprature = result * 0.0625; // 温度寄存器为12bit, 温度分辨率为0.0625
+}
